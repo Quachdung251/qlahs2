@@ -1,0 +1,453 @@
+import React, { useState } from 'react';
+import { Plus, Trash2, Edit2, Save, X, Book, Users, Upload } from 'lucide-react';
+import { criminalCodeData, CriminalCodeItem } from '../data/criminalCode';
+import { prosecutorsData, Prosecutor } from '../data/prosecutors';
+
+interface DataManagementProps {
+  onUpdateCriminalCode: (data: CriminalCodeItem[]) => void;
+  onUpdateProsecutors: (data: Prosecutor[]) => void;
+}
+
+const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, onUpdateProsecutors }) => {
+  const [activeSection, setActiveSection] = useState<'criminal' | 'prosecutors'>('criminal');
+  const [criminalData, setCriminalData] = useState<CriminalCodeItem[]>(criminalCodeData);
+  const [prosecutorData, setProsecutorData] = useState<Prosecutor[]>(prosecutorsData);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [newItem, setNewItem] = useState<any>(null);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+
+  // Bulk Import for Criminal Code
+  const processBulkImport = () => {
+    const lines = bulkImportText.split('\n').filter(line => line.trim());
+    const newCodes: CriminalCodeItem[] = [];
+
+    lines.forEach(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine) {
+        // Parse format: "165 ; Tội làm, tàng trữ, lưu hành tiền giả"
+        const parts = trimmedLine.split(';');
+        if (parts.length >= 2) {
+          const article = parts[0].trim();
+          const title = parts[1].trim();
+          
+          // Check if article already exists
+          const exists = criminalData.some(code => code.article === article);
+          if (!exists) {
+            newCodes.push({
+              article,
+              title,
+              description: ''
+            });
+          }
+        }
+      }
+    });
+
+    if (newCodes.length > 0) {
+      const updated = [...criminalData, ...newCodes];
+      setCriminalData(updated);
+      onUpdateCriminalCode(updated);
+      setBulkImportText('');
+      setShowBulkImport(false);
+      alert(`Đã thêm ${newCodes.length} điều luật mới!`);
+    } else {
+      alert('Không có dữ liệu hợp lệ để thêm hoặc tất cả đã tồn tại.');
+    }
+  };
+
+  // Criminal Code Management
+  const addCriminalCode = () => {
+    const newCode: CriminalCodeItem = {
+      article: '',
+      title: '',
+      description: ''
+    };
+    setNewItem(newCode);
+  };
+
+  const saveCriminalCode = (item: CriminalCodeItem, isNew: boolean = false) => {
+    if (isNew) {
+      const updated = [...criminalData, item];
+      setCriminalData(updated);
+      onUpdateCriminalCode(updated);
+      setNewItem(null);
+    } else {
+      const updated = criminalData.map(code => 
+        code.article === item.article ? item : code
+      );
+      setCriminalData(updated);
+      onUpdateCriminalCode(updated);
+      setEditingId(null);
+    }
+  };
+
+  const deleteCriminalCode = (article: string) => {
+    const updated = criminalData.filter(code => code.article !== article);
+    setCriminalData(updated);
+    onUpdateCriminalCode(updated);
+  };
+
+  // Prosecutor Management
+  const addProsecutor = () => {
+    const newProsecutor: Prosecutor = {
+      id: Date.now().toString(),
+      name: '',
+      title: 'Kiểm sát viên', // Default value
+      department: '' // Empty by default
+    };
+    setNewItem(newProsecutor);
+  };
+
+  const saveProsecutor = (item: Prosecutor, isNew: boolean = false) => {
+    if (isNew) {
+      const updated = [...prosecutorData, item];
+      setProsecutorData(updated);
+      onUpdateProsecutors(updated);
+      setNewItem(null);
+    } else {
+      const updated = prosecutorData.map(prosecutor => 
+        prosecutor.id === item.id ? item : prosecutor
+      );
+      setProsecutorData(updated);
+      onUpdateProsecutors(updated);
+      setEditingId(null);
+    }
+  };
+
+  const deleteProsecutor = (id: string) => {
+    const updated = prosecutorData.filter(prosecutor => prosecutor.id !== id);
+    setProsecutorData(updated);
+    onUpdateProsecutors(updated);
+  };
+
+  const CriminalCodeForm: React.FC<{ item: CriminalCodeItem; onSave: (item: CriminalCodeItem) => void; onCancel: () => void }> = ({ item, onSave, onCancel }) => {
+    const [formData, setFormData] = useState(item);
+
+    return (
+      <tr className="bg-blue-50">
+        <td className="px-4 py-2">
+          <input
+            type="text"
+            value={formData.article}
+            onChange={(e) => setFormData({ ...formData, article: e.target.value })}
+            className="w-full p-2 border rounded"
+            placeholder="Số điều"
+          />
+        </td>
+        <td className="px-4 py-2">
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className="w-full p-2 border rounded"
+            placeholder="Tên tội danh"
+          />
+        </td>
+        <td className="px-4 py-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => onSave(formData)}
+              className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              <Save size={14} />
+              Lưu
+            </button>
+            <button
+              onClick={onCancel}
+              className="flex items-center gap-1 px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              <X size={14} />
+              Hủy
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  const ProsecutorForm: React.FC<{ item: Prosecutor; onSave: (item: Prosecutor) => void; onCancel: () => void }> = ({ item, onSave, onCancel }) => {
+    const [formData, setFormData] = useState(item);
+
+    return (
+      <tr className="bg-blue-50">
+        <td className="px-4 py-2">
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className="w-full p-2 border rounded"
+            placeholder="Họ tên"
+          />
+        </td>
+        <td className="px-4 py-2">
+          <select
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className="w-full p-2 border rounded"
+          >
+            <option value="Kiểm sát viên">Kiểm sát viên</option>
+            <option value="Kiểm sát viên chính">Kiểm sát viên chính</option>
+            <option value="Phó Viện trưởng">Phó Viện trưởng</option>
+            <option value="Viện trưởng">Viện trưởng</option>
+          </select>
+        </td>
+        <td className="px-4 py-2">
+          <select
+            value={formData.department || ''}
+            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+            className="w-full p-2 border rounded"
+          >
+            <option value="">Chọn phòng ban</option>
+            <option value="Ban Lãnh đạo">Ban Lãnh đạo</option>
+            <option value="Phòng Điều tra">Phòng Điều tra</option>
+            <option value="Phòng Truy tố">Phòng Truy tố</option>
+            <option value="Phòng Xét xử">Phòng Xét xử</option>
+            <option value="Văn phòng">Văn phòng</option>
+          </select>
+        </td>
+        <td className="px-4 py-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => onSave(formData)}
+              className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              <Save size={14} />
+              Lưu
+            </button>
+            <button
+              onClick={onCancel}
+              className="flex items-center gap-1 px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              <X size={14} />
+              Hủy
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">Quản Lý Dữ Liệu Hệ Thống</h2>
+      
+      {/* Section Tabs */}
+      <div className="flex mb-6 border-b">
+        <button
+          onClick={() => setActiveSection('criminal')}
+          className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium ${
+            activeSection === 'criminal' 
+              ? 'border-blue-500 text-blue-600' 
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Book size={18} />
+          Bộ Luật Hình Sự
+        </button>
+        <button
+          onClick={() => setActiveSection('prosecutors')}
+          className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium ${
+            activeSection === 'prosecutors' 
+              ? 'border-blue-500 text-blue-600' 
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Users size={18} />
+          Kiểm Sát Viên
+        </button>
+      </div>
+
+      {/* Criminal Code Section */}
+      {activeSection === 'criminal' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold">Danh Sách Điều Luật</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowBulkImport(!showBulkImport)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                <Upload size={16} />
+                Import Hàng Loạt
+              </button>
+              <button
+                onClick={addCriminalCode}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                <Plus size={16} />
+                Thêm Điều Luật
+              </button>
+            </div>
+          </div>
+
+          {/* Bulk Import Section */}
+          {showBulkImport && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+              <h4 className="text-lg font-medium mb-3">Import Hàng Loạt Điều Luật</h4>
+              <p className="text-sm text-gray-600 mb-3">
+                Nhập dữ liệu theo định dạng: <strong>Số điều ; Tên tội danh</strong> (mỗi dòng một điều luật)
+              </p>
+              <p className="text-sm text-gray-500 mb-3">
+                Ví dụ:<br/>
+                165 ; Tội làm, tàng trữ, lưu hành tiền giả<br/>
+                166 ; Tội lừa đảo chiếm đoạt tài sản
+              </p>
+              <textarea
+                value={bulkImportText}
+                onChange={(e) => setBulkImportText(e.target.value)}
+                className="w-full p-3 border rounded-md h-32 mb-3"
+                placeholder="165 ; Tội làm, tàng trữ, lưu hành tiền giả&#10;166 ; Tội lừa đảo chiếm đoạt tài sản&#10;167 ; Tội khác..."
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={processBulkImport}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Xử Lý Import
+                </button>
+                <button
+                  onClick={() => {
+                    setShowBulkImport(false);
+                    setBulkImportText('');
+                  }}
+                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                >
+                  Hủy
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="overflow-x-auto">
+            <table className="w-full border border-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left">Điều</th>
+                  <th className="px-4 py-2 text-left">Tên Tội Danh</th>
+                  <th className="px-4 py-2 text-left">Hành Động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {newItem && activeSection === 'criminal' && (
+                  <CriminalCodeForm
+                    item={newItem}
+                    onSave={(item) => saveCriminalCode(item, true)}
+                    onCancel={() => setNewItem(null)}
+                  />
+                )}
+                {criminalData.map((code) => (
+                  editingId === code.article ? (
+                    <CriminalCodeForm
+                      key={code.article}
+                      item={code}
+                      onSave={(item) => saveCriminalCode(item)}
+                      onCancel={() => setEditingId(null)}
+                    />
+                  ) : (
+                    <tr key={code.article} className="border-t hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium">{code.article}</td>
+                      <td className="px-4 py-2">{code.title}</td>
+                      <td className="px-4 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingId(code.article)}
+                            className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
+                          >
+                            <Edit2 size={12} />
+                            Sửa
+                          </button>
+                          <button
+                            onClick={() => deleteCriminalCode(code.article)}
+                            className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                          >
+                            <Trash2 size={12} />
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Prosecutors Section */}
+      {activeSection === 'prosecutors' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold">Danh Sách Kiểm Sát Viên</h3>
+            <button
+              onClick={addProsecutor}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              <Plus size={16} />
+              Thêm Kiểm Sát Viên
+            </button>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full border border-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left">Họ Tên</th>
+                  <th className="px-4 py-2 text-left">Chức Vụ</th>
+                  <th className="px-4 py-2 text-left">Phòng Ban</th>
+                  <th className="px-4 py-2 text-left">Hành Động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {newItem && activeSection === 'prosecutors' && (
+                  <ProsecutorForm
+                    item={newItem}
+                    onSave={(item) => saveProsecutor(item, true)}
+                    onCancel={() => setNewItem(null)}
+                  />
+                )}
+                {prosecutorData.map((prosecutor) => (
+                  editingId === prosecutor.id ? (
+                    <ProsecutorForm
+                      key={prosecutor.id}
+                      item={prosecutor}
+                      onSave={(item) => saveProsecutor(item)}
+                      onCancel={() => setEditingId(null)}
+                    />
+                  ) : (
+                    <tr key={prosecutor.id} className="border-t hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium">{prosecutor.name}</td>
+                      <td className="px-4 py-2">{prosecutor.title}</td>
+                      <td className="px-4 py-2">{prosecutor.department || '-'}</td>
+                      <td className="px-4 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingId(prosecutor.id)}
+                            className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
+                          >
+                            <Edit2 size={12} />
+                            Sửa
+                          </button>
+                          <button
+                            onClick={() => deleteProsecutor(prosecutor.id)}
+                            className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                          >
+                            <Trash2 size={12} />
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DataManagement;
