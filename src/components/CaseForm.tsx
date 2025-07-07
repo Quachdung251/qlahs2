@@ -5,22 +5,18 @@ import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
 import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
-// import { prosecutorsData } from '../data/prosecutors'; // <-- XÓA DÒNG NÀY HOẶC COMMENT NÓ LẠI
-
-// IMPORT Prosecutor interface từ api/prosecutors
-import { Prosecutor } from '../api/prosecutors'; // <-- THÊM DÒNG NÀY
+import { prosecutorsData } from '../data/prosecutors';
 
 interface CaseFormProps {
   onAddCase: (caseData: CaseFormData) => void;
-  prosecutors: Prosecutor[]; // <-- THÊM PROP NÀY VÀO INTERFACE
 }
 
-const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <-- NHẬN PROP prosecutors
+const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
   const [formData, setFormData] = useState<CaseFormData>({
     name: '',
     charges: '',
     investigationDeadline: getCurrentDate(),
-    prosecutor: '', // Đây sẽ lưu ID của KSV
+    prosecutor: '',
     notes: '',
     defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
   });
@@ -77,28 +73,12 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <
       }
       return defendant;
     });
+    setFormData({ ...formData, defendants: updatedDefendants });
 
-    // --- LOGIC AUTO-FILL NGAY LẬP TỨC (đã thêm vào trước đó) ---
-    let updatedFormData = { ...formData, defendants: updatedDefendants };
-
-    // Auto-update case name when first defendant's name changes and case name is empty
-    if (index === 0 && field === 'name') {
-      if (!formData.name.trim()) {
-        const firstDefendant = updatedDefendants[0];
-        const caseName = `${firstDefendant.name.trim()} - ${firstDefendant.charges.trim() || 'Chưa xác định tội danh'}`;
-        updatedFormData.name = caseName;
-      }
+    // Auto-update case charges when first defendant's charges change
+    if (index === 0 && field === 'charges' && !formData.charges.trim()) {
+      setFormData(prev => ({ ...prev, charges: value, defendants: updatedDefendants }));
     }
-
-    // Auto-update case charges when first defendant's charges change and case charges is empty
-    if (index === 0 && field === 'charges') {
-      if (!formData.charges.trim()) {
-        updatedFormData.charges = value;
-      }
-    }
-    // --- KẾT THÚC LOGIC AUTO-FILL MỚI ---
-
-    setFormData(updatedFormData);
   };
 
   // Prepare options for autocomplete
@@ -108,10 +88,9 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <
     description: item.description
   }));
 
-  // ---------- SỬ DỤNG PROP prosecutors THAY VÌ prosecutorsData ----------
-  const prosecutorOptions = prosecutors.map(prosecutor => ({
-    value: prosecutor.id || '', // <-- LƯU ID CỦA KSV VÀO value
-    label: prosecutor.Name, // <-- DÙNG prosecutor.Name (chữ N hoa) để hiển thị
+  const prosecutorOptions = prosecutorsData.map(prosecutor => ({
+    value: prosecutor.name,
+    label: prosecutor.name,
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
   }));
 
