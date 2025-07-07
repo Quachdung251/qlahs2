@@ -5,13 +5,17 @@ import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
 import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
-import { prosecutorsData } from '../data/prosecutors';
+// import { prosecutorsData } from '../data/prosecutors'; // <-- XÓA DÒNG NÀY HOẶC COMMENT NÓ LẠI
+
+// IMPORT Prosecutor interface từ api/prosecutors
+import { Prosecutor } from '../api/prosecutors'; // <-- THÊM DÒNG NÀY
 
 interface CaseFormProps {
   onAddCase: (caseData: CaseFormData) => void;
+  prosecutors: Prosecutor[]; // <-- THÊM PROP NÀY VÀO INTERFACE
 }
 
-const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
+const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <-- NHẬN PROP prosecutors
   const [formData, setFormData] = useState<CaseFormData>({
     name: '',
     charges: '',
@@ -37,6 +41,17 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
       finalCaseData.charges = formData.defendants[0].charges;
     }
     
+    // --- LƯU Ý QUAN TRỌNG VỀ prosecutor:
+    // Nếu bạn muốn lưu ID của KSV vào trường `prosecutor` của CaseFormData,
+    // thì `formData.prosecutor` cần chứa ID.
+    // Nếu bạn đang lưu `name` của KSV, thì trường `prosecutor` trong database
+    // cũng phải là `text` và lưu `name`.
+    // Tôi sẽ giả định bạn muốn lưu ID KSV vào `formData.prosecutor` và tên KSV vào `item.prosecutorName`
+    // hoặc bạn sẽ chuyển đổi `prosecutor` (đang là ID) thành tên khi hiển thị.
+    // Hiện tại, `formData.prosecutor` đang lưu `value` từ AutocompleteInput,
+    // mà AutocompleteInput ở dưới đang trả về `prosecutor.id` cho `value`.
+    // => Vậy là `formData.prosecutor` sẽ lưu ID của KSV. Điều này là tốt.
+
     onAddCase(finalCaseData);
     setFormData({
       name: '',
@@ -88,9 +103,10 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
     description: item.description
   }));
 
-  const prosecutorOptions = prosecutorsData.map(prosecutor => ({
-    value: prosecutor.name,
-    label: prosecutor.name,
+  // ---------- SỬ DỤNG PROP prosecutors THAY VÌ prosecutorsData ----------
+  const prosecutorOptions = prosecutors.map(prosecutor => ({
+    value: prosecutor.id || '', // <-- QUAN TRỌNG: LƯU ID CỦA KSV VÀO value
+    label: prosecutor.Name, // <-- DÙNG prosecutor.Name (chữ N hoa) để hiển thị
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
   }));
 
@@ -148,7 +164,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
             <AutocompleteInput
               value={formData.prosecutor}
               onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions}
+              options={prosecutorOptions} // <-- ĐÃ CẬP NHẬT ĐỂ SỬ DỤNG prosecutors từ props
               placeholder="Nhập hoặc chọn kiểm sát viên"
               required
               icon={<User size={16} />}
