@@ -29,8 +29,8 @@ const App: React.FC = () => {
   const [selectedProsecutor, setSelectedProsecutor] = useState('');
   
   const userKey = user?.id || 'default';
-  const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading } = useCases(userKey);
-  const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading } = useReports(userKey);
+  const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading } = useCases(userKey, isInitialized);
+  const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading } = useReports(userKey, isInitialized);
 
   // Show loading while initializing
   if (loading || !isInitialized) {

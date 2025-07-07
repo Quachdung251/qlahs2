@@ -3,12 +3,14 @@ import { Case, CaseFormData } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import { dbManager } from '../utils/indexedDB';
 
-export const useCases = (userKey: string) => {
+export const useCases = (userKey: string, isDBInitialized: boolean) => {
   const [cases, setCases] = useState<Case[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load cases from IndexedDB on mount
   useEffect(() => {
+    if (!isDBInitialized) return;
+
     const loadCases = async () => {
       try {
         const savedCases = await dbManager.loadData<Case>('cases');
@@ -26,26 +28,26 @@ export const useCases = (userKey: string) => {
     };
 
     loadCases();
-  }, [userKey]);
+  }, [userKey, isDBInitialized]);
 
   // Save cases to IndexedDB whenever cases change
   useEffect(() => {
-    if (!isLoading && cases.length >= 0) {
-      const saveCases = async () => {
-        try {
-          await dbManager.saveData('cases', cases);
-          // Also save to localStorage as backup
-          localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
-        } catch (error) {
-          console.error('Failed to save cases:', error);
-          // Fallback to localStorage
-          localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
-        }
-      };
+    if (!isDBInitialized || isLoading || cases.length < 0) return;
 
-      saveCases();
-    }
-  }, [cases, userKey, isLoading]);
+    const saveCases = async () => {
+      try {
+        await dbManager.saveData('cases', cases);
+        // Also save to localStorage as backup
+        localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
+      } catch (error) {
+        console.error('Failed to save cases:', error);
+        // Fallback to localStorage
+        localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
+      }
+    };
+
+    saveCases();
+  }, [cases, userKey, isLoading, isDBInitialized]);
 
   const addCase = (caseData: CaseFormData) => {
     const newCase: Case = {

@@ -3,12 +3,14 @@ import { Report, ReportFormData } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import { dbManager } from '../utils/indexedDB';
 
-export const useReports = (userKey: string) => {
+export const useReports = (userKey: string, isDBInitialized: boolean) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load reports from IndexedDB on mount
   useEffect(() => {
+    if (!isDBInitialized) return;
+
     const loadReports = async () => {
       try {
         const savedReports = await dbManager.loadData<Report>('reports');
@@ -26,26 +28,26 @@ export const useReports = (userKey: string) => {
     };
 
     loadReports();
-  }, [userKey]);
+  }, [userKey, isDBInitialized]);
 
   // Save reports to IndexedDB whenever reports change
   useEffect(() => {
-    if (!isLoading && reports.length >= 0) {
-      const saveReports = async () => {
-        try {
-          await dbManager.saveData('reports', reports);
-          // Also save to localStorage as backup
-          localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(reports));
-        } catch (error) {
-          console.error('Failed to save reports:', error);
-          // Fallback to localStorage
-          localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(reports));
-        }
-      };
+    if (!isDBInitialized || isLoading || reports.length < 0) return;
 
-      saveReports();
-    }
-  }, [reports, userKey, isLoading]);
+    const saveReports = async () => {
+      try {
+        await dbManager.saveData('reports', reports);
+        // Also save to localStorage as backup
+        localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(reports));
+      } catch (error) {
+        console.error('Failed to save reports:', error);
+        // Fallback to localStorage
+        localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(reports));
+      }
+    };
+
+    saveReports();
+  }, [reports, userKey, isLoading, isDBInitialized]);
 
   const addReport = (reportData: ReportFormData) => {
     const newReport: Report = {
