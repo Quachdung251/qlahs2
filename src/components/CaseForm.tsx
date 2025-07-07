@@ -20,7 +20,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <
     name: '',
     charges: '',
     investigationDeadline: getCurrentDate(),
-    prosecutor: '',
+    prosecutor: '', // Đây sẽ lưu ID của KSV
     notes: '',
     defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
   });
@@ -41,17 +41,6 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <
       finalCaseData.charges = formData.defendants[0].charges;
     }
     
-    // --- LƯU Ý QUAN TRỌNG VỀ prosecutor:
-    // Nếu bạn muốn lưu ID của KSV vào trường `prosecutor` của CaseFormData,
-    // thì `formData.prosecutor` cần chứa ID.
-    // Nếu bạn đang lưu `name` của KSV, thì trường `prosecutor` trong database
-    // cũng phải là `text` và lưu `name`.
-    // Tôi sẽ giả định bạn muốn lưu ID KSV vào `formData.prosecutor` và tên KSV vào `item.prosecutorName`
-    // hoặc bạn sẽ chuyển đổi `prosecutor` (đang là ID) thành tên khi hiển thị.
-    // Hiện tại, `formData.prosecutor` đang lưu `value` từ AutocompleteInput,
-    // mà AutocompleteInput ở dưới đang trả về `prosecutor.id` cho `value`.
-    // => Vậy là `formData.prosecutor` sẽ lưu ID của KSV. Điều này là tốt.
-
     onAddCase(finalCaseData);
     setFormData({
       name: '',
@@ -88,12 +77,28 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <
       }
       return defendant;
     });
-    setFormData({ ...formData, defendants: updatedDefendants });
 
-    // Auto-update case charges when first defendant's charges change
-    if (index === 0 && field === 'charges' && !formData.charges.trim()) {
-      setFormData(prev => ({ ...prev, charges: value, defendants: updatedDefendants }));
+    // --- LOGIC AUTO-FILL NGAY LẬP TỨC (đã thêm vào trước đó) ---
+    let updatedFormData = { ...formData, defendants: updatedDefendants };
+
+    // Auto-update case name when first defendant's name changes and case name is empty
+    if (index === 0 && field === 'name') {
+      if (!formData.name.trim()) {
+        const firstDefendant = updatedDefendants[0];
+        const caseName = `${firstDefendant.name.trim()} - ${firstDefendant.charges.trim() || 'Chưa xác định tội danh'}`;
+        updatedFormData.name = caseName;
+      }
     }
+
+    // Auto-update case charges when first defendant's charges change and case charges is empty
+    if (index === 0 && field === 'charges') {
+      if (!formData.charges.trim()) {
+        updatedFormData.charges = value;
+      }
+    }
+    // --- KẾT THÚC LOGIC AUTO-FILL MỚI ---
+
+    setFormData(updatedFormData);
   };
 
   // Prepare options for autocomplete
@@ -105,7 +110,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <
 
   // ---------- SỬ DỤNG PROP prosecutors THAY VÌ prosecutorsData ----------
   const prosecutorOptions = prosecutors.map(prosecutor => ({
-    value: prosecutor.id || '', // <-- QUAN TRỌNG: LƯU ID CỦA KSV VÀO value
+    value: prosecutor.id || '', // <-- LƯU ID CỦA KSV VÀO value
     label: prosecutor.Name, // <-- DÙNG prosecutor.Name (chữ N hoa) để hiển thị
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
   }));
@@ -164,7 +169,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // <
             <AutocompleteInput
               value={formData.prosecutor}
               onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions} // <-- ĐÃ CẬP NHẬT ĐỂ SỬ DỤNG prosecutors từ props
+              options={prosecutorOptions}
               placeholder="Nhập hoặc chọn kiểm sát viên"
               required
               icon={<User size={16} />}
