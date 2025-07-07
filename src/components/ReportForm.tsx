@@ -5,14 +5,18 @@ import { getCurrentDate, addDaysToDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
 import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
-import { prosecutorsData } from '../data/prosecutors';
+// import { prosecutorsData } from '../data/prosecutors'; // <-- XÓA DÒNG NÀY HOẶC COMMENT NÓ LẠI
+
+// IMPORT Prosecutor interface từ api/prosecutors
+import { Prosecutor } from '../api/prosecutors'; // <-- THÊM DÒNG NÀY
 
 interface ReportFormProps {
   onAddReport: (reportData: ReportFormData) => void;
   onTransferToCase: (caseData: CaseFormData) => void;
+  prosecutors: Prosecutor[]; // <-- THÊM PROP NÀY VÀO INTERFACE
 }
 
-const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }) => {
+const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, prosecutors }) => { // <-- NHẬN PROP prosecutors
   const [formData, setFormData] = useState<ReportFormData>({
     name: '',
     charges: '',
@@ -39,7 +43,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
       name: formData.name,
       charges: formData.charges,
       investigationDeadline: getCurrentDate(), // Set to today as starting point
-      prosecutor: formData.prosecutor,
+      prosecutor: formData.prosecutor, // Prosecutor ID from report
       notes: formData.notes,
       defendants: [] // Empty defendants array - will be added later
     };
@@ -65,9 +69,10 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
     description: item.description
   }));
 
-  const prosecutorOptions = prosecutorsData.map(prosecutor => ({
-    value: prosecutor.name,
-    label: prosecutor.name,
+  // ---------- SỬ DỤNG PROP prosecutors THAY VÌ prosecutorsData ----------
+  const prosecutorOptions = prosecutors.map(prosecutor => ({
+    value: prosecutor.id || '', // <-- Lấy ID của KSV để lưu vào value
+    label: prosecutor.Name, // <-- Hiển thị tên KSV (lưu ý 'Name' chữ N hoa từ DB)
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
   }));
 
@@ -126,7 +131,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
             <AutocompleteInput
               value={formData.prosecutor}
               onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions}
+              options={prosecutorOptions} // <-- ĐÃ CẬP NHẬT ĐỂ SỬ DỤNG prosecutors từ props
               placeholder="Nhập hoặc chọn kiểm sát viên"
               required
               icon={<User size={16} />}
