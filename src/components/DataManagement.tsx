@@ -1,62 +1,93 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Save, X, Book, Users, Upload, Download } from 'lucide-react';
-import { criminalCodeData, CriminalCodeItem } from '../data/criminalCode';
-import { prosecutorsData, Prosecutor } from '../data/prosecutors';
-import { dbManager } from '../utils/indexedDB';
+// Giữ lại import này nếu bạn vẫn muốn quản lý CriminalCode cục bộ
+import { criminalCodeData, CriminalCodeItem } from '../data/criminalCode'; 
+import { dbManager } from '../utils/indexedDB'; // Vẫn dùng IndexedDB cho việc lưu cục bộ
 import { useIndexedDB } from '../hooks/useIndexedDB';
 
+// Import các hàm và interface cho Kiểm sát viên từ Supabase API
+import {
+  fetchProsecutors,
+  addProsecutor,
+  searchProsecutors,
+  // Thêm updateProsecutor và deleteProsecutor nếu bạn đã tạo chúng trong src/api/prosecutors.ts
+  // updateProsecutor,
+  // deleteProsecutor,
+  Prosecutor // Import interface Prosecutor từ file api
+} from '../api/prosecutors';
+
+import { useSupabaseAuth } from '../hooks/useSupabaseAuth'; // Để lấy thông tin user Supabase
+
 interface DataManagementProps {
+  // onUpdateCriminalCode và onUpdateProsecutors sẽ không còn được sử dụng để đẩy dữ liệu lên cha nữa
+  // vì dữ liệu sẽ được quản lý trực tiếp qua Supabase và IndexedDB.
+  // Bạn có thể giữ chúng nếu có các side-effects khác cần được kích hoạt.
   onUpdateCriminalCode: (data: CriminalCodeItem[]) => void;
   onUpdateProsecutors: (data: Prosecutor[]) => void;
 }
 
 const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, onUpdateProsecutors }) => {
+  const { user, loading: authLoading } = useSupabaseAuth(); // Lấy thông tin user Supabase
   const [activeSection, setActiveSection] = useState<'criminal' | 'prosecutors' | 'backup'>('criminal');
   const [criminalData, setCriminalData] = useState<CriminalCodeItem[]>(criminalCodeData);
-  const [prosecutorData, setProsecutorData] = useState<Prosecutor[]>(prosecutorsData);
+  // Thay đổi trạng thái này để chứa dữ liệu từ Supabase, không phải từ mảng cứng nữa
+  const [prosecutorData, setProsecutorData] = useState<Prosecutor[]>([]); 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newItem, setNewItem] = useState<any>(null);
+  const [newItem, setNewItem] = useState<any>(null); // Có thể là CriminalCodeItem hoặc Prosecutor
   const [bulkImportText, setBulkImportText] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
-  
+  const [prosecutorLoading, setProsecutorLoading] = useState(true); // Thêm trạng thái loading cho Kiểm sát viên
+
   const { exportData, importData } = useIndexedDB();
 
-  // Load data from IndexedDB on mount
+  // Load Criminal Code data from IndexedDB on mount
   useEffect(() => {
-    const loadData = async () => {
+    const loadCriminalData = async () => {
       try {
         const savedCriminalCode = await dbManager.loadData<CriminalCodeItem>('criminalCode');
-        const savedProsecutors = await dbManager.loadData<Prosecutor>('prosecutors');
-        
         if (savedCriminalCode.length > 0) {
           setCriminalData(savedCriminalCode);
         }
-        if (savedProsecutors.length > 0) {
-          setProsecutorData(savedProsecutors);
-        }
       } catch (error) {
-        console.error('Failed to load data:', error);
+        console.error('Failed to load criminal code data from IndexedDB:', error);
       }
     };
-
-    loadData();
+    loadCriminalData();
   }, []);
 
-  // Save data to IndexedDB when changed
+  // Save Criminal Code data to IndexedDB when changed
   useEffect(() => {
-    const saveData = async () => {
+    const saveCriminalData = async () => {
       try {
         await dbManager.saveData('criminalCode', criminalData);
-        await dbManager.saveData('prosecutors', prosecutorData);
       } catch (error) {
-        console.error('Failed to save data:', error);
+        console.error('Failed to save criminal code data to IndexedDB:', error);
       }
     };
+    saveCriminalData();
+  }, [criminalData]);
 
-    saveData();
-  }, [criminalData, prosecutorData]);
+  // Load Prosecutor data from Supabase when user changes or on mount
+  useEffect(() => {
+    const loadProsecutorsFromSupabase = async () => {
+      // Chỉ tải dữ liệu nếu người dùng đã được xác định và không còn trong trạng thái loading của auth
+      if (!authLoading) {
+        setProsecutorLoading(true); // Bắt đầu loading
+        if (user) {
+          const data = await fetchProsecutors(); // RLS sẽ tự động lọc dữ liệu của user hiện tại
+          setProsecutorData(data);
+        } else {
+          // Nếu không có người dùng đăng nhập, xóa dữ liệu Kiểm sát viên hiện có
+          setProsecutorData([]);
+          console.log("No user logged in, cannot fetch prosecutors data from Supabase.");
+        }
+        setProsecutorLoading(false); // Kết thúc loading
+      }
+    };
+    loadProsecutorsFromSupabase();
+  }, [user, authLoading]); // Dependency array: Re-run khi user hoặc authLoading thay đổi
 
-  // Bulk Import for Criminal Code
+  // Bulk Import for Criminal Code (vẫn giữ nguyên logic IndexedDB)
   const processBulkImport = () => {
     const lines = bulkImportText.split('\n').filter(line => line.trim());
     const newCodes: CriminalCodeItem[] = [];
@@ -64,13 +95,11 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     lines.forEach(line => {
       const trimmedLine = line.trim();
       if (trimmedLine) {
-        // Parse format: "165 ; Tội làm, tàng trữ, lưu hành tiền giả"
         const parts = trimmedLine.split(';');
         if (parts.length >= 2) {
           const article = parts[0].trim();
           const title = parts[1].trim();
-          
-          // Check if article already exists
+
           const exists = criminalData.some(code => code.article === article);
           if (!exists) {
             newCodes.push({
@@ -89,13 +118,13 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
       onUpdateCriminalCode(updated);
       setBulkImportText('');
       setShowBulkImport(false);
-      alert(`Đã thêm ${newCodes.length} điều luật mới!`);
+      alert(`Đã thêm ${newCodes.length} điều luật mới vào IndexedDB!`);
     } else {
       alert('Không có dữ liệu hợp lệ để thêm hoặc tất cả đã tồn tại.');
     }
   };
 
-  // Criminal Code Management
+  // Criminal Code Management (vẫn giữ nguyên logic IndexedDB)
   const addCriminalCode = () => {
     const newCode: CriminalCodeItem = {
       article: '',
@@ -112,7 +141,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
       onUpdateCriminalCode(updated);
       setNewItem(null);
     } else {
-      const updated = criminalData.map(code => 
+      const updated = criminalData.map(code =>
         code.article === item.article ? item : code
       );
       setCriminalData(updated);
@@ -127,40 +156,74 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     onUpdateCriminalCode(updated);
   };
 
-  // Prosecutor Management
-  const addProsecutor = () => {
-    const newProsecutor: Prosecutor = {
-      id: Date.now().toString(),
-      name: '',
-      title: 'Kiểm sát viên',
-      department: ''
-    };
-    setNewItem(newProsecutor);
+  // Prosecutor Management (Đã thay đổi để sử dụng Supabase)
+  const handleAddProsecutor = () => {
+    if (!user) {
+      alert('Vui lòng đăng nhập để thêm Kiểm sát viên.');
+      return;
+    }
+    // Đặt newItem để hiển thị form thêm mới
+    setNewItem({ name: '', title: 'Kiểm sát viên', department: '' });
   };
 
-  const saveProsecutor = (item: Prosecutor, isNew: boolean = false) => {
+  const saveOrUpdateProsecutor = async (item: Prosecutor, isNew: boolean = false) => {
+    if (!user) {
+      alert('Bạn cần đăng nhập để thực hiện thao tác này.');
+      return;
+    }
+
     if (isNew) {
-      const updated = [...prosecutorData, item];
-      setProsecutorData(updated);
-      onUpdateProsecutors(updated);
-      setNewItem(null);
+      // Gọi hàm addProsecutor từ api/prosecutors.ts (sẽ gửi lên Supabase)
+      const { success, error } = await addProsecutor(item);
+      if (success) {
+        alert('Thêm Kiểm sát viên thành công!');
+        setNewItem(null); // Đóng form thêm mới
+        const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
+        setProsecutorData(updatedData);
+        onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
+      } else {
+        alert('Lỗi khi thêm Kiểm sát viên: ' + error?.message);
+      }
     } else {
-      const updated = prosecutorData.map(prosecutor => 
-        prosecutor.id === item.id ? item : prosecutor
-      );
-      setProsecutorData(updated);
-      onUpdateProsecutors(updated);
-      setEditingId(null);
+      // Logic cho việc UPDATE (bạn cần thêm hàm updateProsecutor vào src/api/prosecutors.ts)
+      // Hiện tại, tôi sẽ để trống hoặc chỉ alert nếu chưa có hàm update
+      alert('Chức năng sửa Kiểm sát viên chưa được triển khai đầy đủ với Supabase.');
+      // Ví dụ nếu có updateProsecutor:
+      // const { success, error } = await updateProsecutor(item.id!, item);
+      // if (success) {
+      //   alert('Cập nhật Kiểm sát viên thành công!');
+      //   setEditingId(null);
+      //   const updatedData = await fetchProsecutors();
+      //   setProsecutorData(updatedData);
+      //   onUpdateProsecutors(updatedData);
+      // } else {
+      //   alert('Lỗi khi cập nhật Kiểm sát viên: ' + error?.message);
+      // }
     }
   };
 
-  const deleteProsecutor = (id: string) => {
-    const updated = prosecutorData.filter(prosecutor => prosecutor.id !== id);
-    setProsecutorData(updated);
-    onUpdateProsecutors(updated);
+  const handleDeleteProsecutor = async (id: string) => {
+    if (!user) {
+      alert('Bạn cần đăng nhập để thực hiện thao tác này.');
+      return;
+    }
+    if (window.confirm('Bạn có chắc chắn muốn xóa Kiểm sát viên này?')) {
+      // Logic cho việc DELETE (bạn cần thêm hàm deleteProsecutor vào src/api/prosecutors.ts)
+      alert('Chức năng xóa Kiểm sát viên chưa được triển khai đầy đủ với Supabase.');
+      // Ví dụ nếu có deleteProsecutor:
+      // const { success, error } = await deleteProsecutor(id);
+      // if (success) {
+      //   alert('Xóa Kiểm sát viên thành công!');
+      //   const updatedData = await fetchProsecutors();
+      //   setProsecutorData(updatedData);
+      //   onUpdateProsecutors(updatedData);
+      // } else {
+      //   alert('Lỗi khi xóa Kiểm sát viên: ' + error?.message);
+      // }
+    }
   };
 
-  // Backup & Restore
+  // Backup & Restore (vẫn giữ nguyên logic IndexedDB)
   const handleExportData = async () => {
     const success = await exportData();
     if (success) {
@@ -181,8 +244,6 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     } else {
       alert('Có lỗi xảy ra khi nhập dữ liệu. Vui lòng kiểm tra định dạng file.');
     }
-    
-    // Reset input
     event.target.value = '';
   };
 
@@ -231,7 +292,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     );
   };
 
-  const ProsecutorForm: React.FC<{ item: Prosecutor; onSave: (item: Prosecutor) => void; onCancel: () => void }> = ({ item, onSave, onCancel }) => {
+  const ProsecutorForm: React.FC<{ item: Prosecutor; onSave: (item: Prosecutor, isNew: boolean) => void; onCancel: () => void; isNew: boolean }> = ({ item, onSave, onCancel, isNew }) => {
     const [formData, setFormData] = useState(item);
 
     return (
@@ -274,7 +335,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
         <td className="px-4 py-2">
           <div className="flex gap-2">
             <button
-              onClick={() => onSave(formData)}
+              onClick={() => onSave(formData, isNew)}
               className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
             >
               <Save size={14} />
@@ -296,14 +357,14 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Quản Lý Dữ Liệu Hệ Thống</h2>
-      
+
       {/* Section Tabs */}
       <div className="flex mb-6 border-b">
         <button
           onClick={() => setActiveSection('criminal')}
           className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium ${
-            activeSection === 'criminal' 
-              ? 'border-blue-500 text-blue-600' 
+            activeSection === 'criminal'
+              ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -313,8 +374,8 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
         <button
           onClick={() => setActiveSection('prosecutors')}
           className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium ${
-            activeSection === 'prosecutors' 
-              ? 'border-blue-500 text-blue-600' 
+            activeSection === 'prosecutors'
+              ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -324,8 +385,8 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
         <button
           onClick={() => setActiveSection('backup')}
           className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium ${
-            activeSection === 'backup' 
-              ? 'border-blue-500 text-blue-600' 
+            activeSection === 'backup'
+              ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -439,7 +500,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
               </div>
             </div>
           )}
-          
+
           <div className="overflow-x-auto">
             <table className="w-full border border-gray-200">
               <thead className="bg-gray-50">
@@ -496,75 +557,83 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
         </div>
       )}
 
-      {/* Prosecutors Section */}
+      {/* Prosecutors Section (Đã thay đổi để dùng Supabase) */}
       {activeSection === 'prosecutors' && (
         <div>
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold">Danh Sách Kiểm Sát Viên</h3>
             <button
-              onClick={addProsecutor}
+              onClick={handleAddProsecutor}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               <Plus size={16} />
               Thêm Kiểm Sát Viên
             </button>
           </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full border border-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left">Họ Tên</th>
-                  <th className="px-4 py-2 text-left">Chức Vụ</th>
-                  <th className="px-4 py-2 text-left">Phòng Ban</th>
-                  <th className="px-4 py-2 text-left">Hành Động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {newItem && activeSection === 'prosecutors' && (
-                  <ProsecutorForm
-                    item={newItem}
-                    onSave={(item) => saveProsecutor(item, true)}
-                    onCancel={() => setNewItem(null)}
-                  />
-                )}
-                {prosecutorData.map((prosecutor) => (
-                  editingId === prosecutor.id ? (
+
+          {prosecutorLoading ? (
+            <div>Đang tải danh sách Kiểm sát viên...</div>
+          ) : !user ? (
+            <div>Vui lòng đăng nhập để xem và quản lý danh sách Kiểm sát viên của bạn.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border border-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Họ Tên</th>
+                    <th className="px-4 py-2 text-left">Chức Vụ</th>
+                    <th className="px-4 py-2 text-left">Phòng Ban</th>
+                    <th className="px-4 py-2 text-left">Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {newItem && activeSection === 'prosecutors' && (
                     <ProsecutorForm
-                      key={prosecutor.id}
-                      item={prosecutor}
-                      onSave={(item) => saveProsecutor(item)}
-                      onCancel={() => setEditingId(null)}
+                      item={newItem}
+                      onSave={(item) => saveOrUpdateProsecutor(item, true)} // Gọi hàm mới
+                      onCancel={() => setNewItem(null)}
+                      isNew={true}
                     />
-                  ) : (
-                    <tr key={prosecutor.id} className="border-t hover:bg-gray-50">
-                      <td className="px-4 py-2 font-medium">{prosecutor.name}</td>
-                      <td className="px-4 py-2">{prosecutor.title}</td>
-                      <td className="px-4 py-2">{prosecutor.department || '-'}</td>
-                      <td className="px-4 py-2">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setEditingId(prosecutor.id)}
-                            className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
-                          >
-                            <Edit2 size={12} />
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => deleteProsecutor(prosecutor.id)}
-                            className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                          >
-                            <Trash2 size={12} />
-                            Xóa
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                  {prosecutorData.map((prosecutor) => (
+                    editingId === prosecutor.id ? (
+                      <ProsecutorForm
+                        key={prosecutor.id}
+                        item={prosecutor}
+                        onSave={(item) => saveOrUpdateProsecutor(item, false)} // Gọi hàm mới
+                        onCancel={() => setEditingId(null)}
+                        isNew={false}
+                      />
+                    ) : (
+                      <tr key={prosecutor.id} className="border-t hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium">{prosecutor.name}</td>
+                        <td className="px-4 py-2">{prosecutor.title}</td>
+                        <td className="px-4 py-2">{prosecutor.department || '-'}</td>
+                        <td className="px-4 py-2">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setEditingId(prosecutor.id || null)}
+                              className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
+                            >
+                              <Edit2 size={12} />
+                              Sửa
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProsecutor(prosecutor.id!)}
+                              className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                            >
+                              <Trash2 size={12} />
+                              Xóa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
