@@ -1,4 +1,5 @@
 // src/api/prosecutors.ts
+// (Đây là nội dung bạn cần đặt vào file này)
 
 import { supabase } from '../utils/supabase'; // Import supabase client từ file cấu hình chính của nó
 
@@ -47,8 +48,6 @@ export const searchProsecutors = async (query: string): Promise<Prosecutor[]> =>
 
 // Hàm để thêm Kiểm sát viên mới (vào dữ liệu riêng của user)
 export const addProsecutor = async (newProsecutor: Omit<Prosecutor, 'id' | 'user_id'>): Promise<{ success: boolean; error?: any }> => {
-  // Vì bạn đã đặt user_id làm DEFAULT VALUE auth.uid() trong DB,
-  // bạn không cần truyền user_id từ frontend nữa. Supabase sẽ tự động điền.
   const { data, error } = await supabase
     .from('prosecutors')
     .insert([newProsecutor])
@@ -61,5 +60,3 @@ export const addProsecutor = async (newProsecutor: Omit<Prosecutor, 'id' | 'user
   console.log('New prosecutor added:', data);
   return { success: true, data: data[0] };
 };
-
-// Bạn có thể thêm các hàm updateProsecutor và deleteProsecutor tại đây nếu cần
