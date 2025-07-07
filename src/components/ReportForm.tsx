@@ -21,7 +21,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, 
     name: '',
     charges: '',
     resolutionDeadline: addDaysToDate(getCurrentDate(), 30), // Mặc định 30 ngày từ hôm nay
-    prosecutor: '',
+    prosecutor: '', // Đây sẽ lưu ID của KSV
     notes: ''
   });
 
@@ -71,8 +71,8 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, 
 
   // ---------- SỬ DỤNG PROP prosecutors THAY VÌ prosecutorsData ----------
   const prosecutorOptions = prosecutors.map(prosecutor => ({
-    value: prosecutor.id || '', // <-- Lấy ID của KSV để lưu vào value
-    label: prosecutor.Name, // <-- Hiển thị tên KSV (lưu ý 'Name' chữ N hoa từ DB)
+    value: prosecutor.id || '', // <-- LƯU ID CỦA KSV VÀO value
+    label: prosecutor.Name, // <-- DÙNG prosecutor.Name (chữ N hoa) để hiển thị
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
   }));
 
@@ -131,7 +131,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, 
             <AutocompleteInput
               value={formData.prosecutor}
               onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions} // <-- ĐÃ CẬP NHẬT ĐỂ SỬ DỤNG prosecutors từ props
+              options={prosecutorOptions}
               placeholder="Nhập hoặc chọn kiểm sát viên"
               required
               icon={<User size={16} />}
