@@ -1,27 +1,23 @@
 import React, { useState } from 'react';
 import { Plus, FileText, Shield, User, Calendar } from 'lucide-react';
 import { ReportFormData, CaseFormData } from '../types';
-import { getCurrentDate, addDaysToDate } from '../utils/dateUtils';
+import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
 import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
-// import { prosecutorsData } from '../data/prosecutors'; // <-- XÓA DÒNG NÀY HOẶC COMMENT NÓ LẠI
-
-// IMPORT Prosecutor interface từ api/prosecutors
-import { Prosecutor } from '../api/prosecutors'; // <-- THÊM DÒNG NÀY
+import { prosecutorsData } from '../data/prosecutors';
 
 interface ReportFormProps {
   onAddReport: (reportData: ReportFormData) => void;
   onTransferToCase: (caseData: CaseFormData) => void;
-  prosecutors: Prosecutor[]; // <-- THÊM PROP NÀY VÀO INTERFACE
 }
 
-const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, prosecutors }) => { // <-- NHẬN PROP prosecutors
+const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }) => {
   const [formData, setFormData] = useState<ReportFormData>({
     name: '',
     charges: '',
-    resolutionDeadline: addDaysToDate(getCurrentDate(), 30), // Mặc định 30 ngày từ hôm nay
-    prosecutor: '', // Đây sẽ lưu ID của KSV
+    reportDate: getCurrentDate(),
+    prosecutor: '',
     notes: ''
   });
 
@@ -31,7 +27,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, 
     setFormData({
       name: '',
       charges: '',
-      resolutionDeadline: addDaysToDate(getCurrentDate(), 30),
+      reportDate: getCurrentDate(),
       prosecutor: '',
       notes: ''
     });
@@ -43,7 +39,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, 
       name: formData.name,
       charges: formData.charges,
       investigationDeadline: getCurrentDate(), // Set to today as starting point
-      prosecutor: formData.prosecutor, // Prosecutor ID from report
+      prosecutor: formData.prosecutor,
       notes: formData.notes,
       defendants: [] // Empty defendants array - will be added later
     };
@@ -54,7 +50,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, 
     setFormData({
       name: '',
       charges: '',
-      resolutionDeadline: addDaysToDate(getCurrentDate(), 30),
+      reportDate: getCurrentDate(),
       prosecutor: '',
       notes: ''
     });
@@ -69,10 +65,9 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, 
     description: item.description
   }));
 
-  // ---------- SỬ DỤNG PROP prosecutors THAY VÌ prosecutorsData ----------
-  const prosecutorOptions = prosecutors.map(prosecutor => ({
-    value: prosecutor.id || '', // <-- LƯU ID CỦA KSV VÀO value
-    label: prosecutor.Name, // <-- DÙNG prosecutor.Name (chữ N hoa) để hiển thị
+  const prosecutorOptions = prosecutorsData.map(prosecutor => ({
+    value: prosecutor.name,
+    label: prosecutor.name,
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
   }));
 
@@ -117,9 +112,9 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, 
           </div>
           
           <DateInput
-            value={formData.resolutionDeadline}
-            onChange={(value) => setFormData({ ...formData, resolutionDeadline: value })}
-            label="Ngày Hết Hạn Giải Quyết"
+            value={formData.reportDate}
+            onChange={(value) => setFormData({ ...formData, reportDate: value })}
+            label="Ngày Tiếp Nhận"
             required
           />
           
