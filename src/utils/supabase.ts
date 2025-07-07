@@ -1,3 +1,5 @@
+// src/utils/supabase.ts
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -17,16 +19,12 @@ export interface UserProfile {
 }
 
 export const authService = {
-  // Thay đổi tham số đầu tiên từ 'username' sang 'email'
   async signUp(email: string, password: string) {
     const { data, error } = await supabase.auth.signUp({
-      email, // Dùng trực tiếp 'email' được truyền vào
+      email,
       password,
       options: {
         data: {
-          // Nếu bạn vẫn muốn lưu 'username' (ví dụ: phần trước @ của email)
-          // hoặc một trường username riêng, bạn cần xử lý ở đây
-          // Ví dụ: username: email.split('@')[0], 
           role: 'user'
         }
       }
@@ -34,10 +32,9 @@ export const authService = {
     return { data, error };
   },
 
-  // Thay đổi tham số đầu tiên từ 'username' sang 'email'
   async signIn(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email, // Dùng trực tiếp 'email' được truyền vào
+      email,
       password
     });
     return { data, error };
