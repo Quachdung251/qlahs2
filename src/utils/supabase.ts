@@ -11,19 +11,22 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface UserProfile {
   id: string;
-  username: string;
+  username: string; // Tên người dùng có thể vẫn là một trường riêng biệt
   role: 'admin' | 'user';
   created_at: string;
 }
 
 export const authService = {
-  async signUp(username: string, password: string) {
+  // Thay đổi tham số đầu tiên từ 'username' sang 'email'
+  async signUp(email: string, password: string) {
     const { data, error } = await supabase.auth.signUp({
-      email: `${username}@legal-system.local`,
+      email, // Dùng trực tiếp 'email' được truyền vào
       password,
       options: {
         data: {
-          username,
+          // Nếu bạn vẫn muốn lưu 'username' (ví dụ: phần trước @ của email)
+          // hoặc một trường username riêng, bạn cần xử lý ở đây
+          // Ví dụ: username: email.split('@')[0], 
           role: 'user'
         }
       }
@@ -31,9 +34,10 @@ export const authService = {
     return { data, error };
   },
 
-  async signIn(username: string, password: string) {
+  // Thay đổi tham số đầu tiên từ 'username' sang 'email'
+  async signIn(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: `${username}@legal-system.local`,
+      email, // Dùng trực tiếp 'email' được truyền vào
       password
     });
     return { data, error };
