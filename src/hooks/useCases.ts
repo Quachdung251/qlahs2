@@ -1,22 +1,51 @@
 import { useState, useEffect } from 'react';
 import { Case, CaseFormData } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
+import { dbManager } from '../utils/indexedDB';
 
 export const useCases = (userKey: string) => {
   const [cases, setCases] = useState<Case[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load cases from localStorage on mount
+  // Load cases from IndexedDB on mount
   useEffect(() => {
-    const savedCases = localStorage.getItem(`legalCases_${userKey}`);
-    if (savedCases) {
-      setCases(JSON.parse(savedCases));
-    }
+    const loadCases = async () => {
+      try {
+        const savedCases = await dbManager.loadData<Case>('cases');
+        setCases(savedCases);
+      } catch (error) {
+        console.error('Failed to load cases:', error);
+        // Fallback to localStorage
+        const fallbackCases = localStorage.getItem(`legalCases_${userKey}`);
+        if (fallbackCases) {
+          setCases(JSON.parse(fallbackCases));
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCases();
   }, [userKey]);
 
-  // Save cases to localStorage whenever cases change
+  // Save cases to IndexedDB whenever cases change
   useEffect(() => {
-    localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
-  }, [cases, userKey]);
+    if (!isLoading && cases.length >= 0) {
+      const saveCases = async () => {
+        try {
+          await dbManager.saveData('cases', cases);
+          // Also save to localStorage as backup
+          localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
+        } catch (error) {
+          console.error('Failed to save cases:', error);
+          // Fallback to localStorage
+          localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
+        }
+      };
+
+      saveCases();
+    }
+  }, [cases, userKey, isLoading]);
 
   const addCase = (caseData: CaseFormData) => {
     const newCase: Case = {
@@ -64,21 +93,17 @@ export const useCases = (userKey: string) => {
 
   const getExpiringSoonCases = () => {
     return cases.filter(c => {
-      // CHỈ ÁP DỤNG CHO VỤ ÁN Ở GIAI ĐOẠN ĐIỀU TRA
       if (c.stage !== 'Điều tra') {
         return false;
       }
 
-      // Check investigation deadline for cases in investigation stage
       const today = new Date();
       const deadline = new Date(c.investigationDeadline.split('/').reverse().join('-'));
       const diffTime = deadline.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
-      // Cảnh báo nếu thời hạn điều tra còn <= 15 ngày
       if (diffDays <= 15) return true;
       
-      // Check detention deadlines for defendants in investigation stage
       const detainedDefendants = c.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
       return detainedDefendants.some(d => {
         const detentionDeadline = new Date(d.detentionDeadline!.split('/').reverse().join('-'));
@@ -96,6 +121,7 @@ export const useCases = (userKey: string) => {
     deleteCase,
     transferStage,
     getCasesByStage,
-    getExpiringSoonCases
+    getExpiringSoonCases,
+    isLoading
   };
 };

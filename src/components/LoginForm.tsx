@@ -2,27 +2,32 @@ import React, { useState } from 'react';
 import { Scale, User, Lock, LogIn } from 'lucide-react';
 
 interface LoginFormProps {
-  onLogin: (username: string, password: string) => boolean;
+  onLogin: (username: string, password: string) => Promise<{ success: boolean; error?: any }>;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     
     if (!username.trim() || !password.trim()) {
       setError('Vui lòng nhập đầy đủ thông tin');
+      setLoading(false);
       return;
     }
 
-    const success = onLogin(username, password);
-    if (!success) {
+    const result = await onLogin(username, password);
+    if (!result.success) {
       setError('Tên đăng nhập hoặc mật khẩu không đúng');
     }
+    
+    setLoading(false);
   };
 
   return (
@@ -49,6 +54,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Nhập tên đăng nhập"
               required
+              disabled={loading}
             />
           </div>
 
@@ -64,6 +70,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Nhập mật khẩu"
               required
+              disabled={loading}
             />
           </div>
 
@@ -75,10 +82,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LogIn size={16} />
-            Đăng Nhập
+            {loading ? 'Đang đăng nhập...' : 'Đăng Nhập'}
           </button>
         </form>
 

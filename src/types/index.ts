@@ -33,7 +33,7 @@ export interface Report {
   id: string;
   name: string;
   charges: string; // Tội danh tin báo
-  reportDate: string; // dd/MM/yyyy format - ngày tiếp nhận
+  resolutionDeadline: string; // dd/MM/yyyy format - ngày hết hạn giải quyết (thay cho reportDate)
   prosecutor: string;
   notes?: string; // Ghi chú
   stage: 'Đang xử lý' | 'Khởi tố' | 'Không khởi tố' | 'Tạm đình chỉ' | 'Chuyển đi';
@@ -45,7 +45,7 @@ export interface Report {
 export interface ReportFormData {
   name: string;
   charges: string;
-  reportDate: string;
+  resolutionDeadline: string; // Thay cho reportDate
   prosecutor: string;
   notes?: string;
 }

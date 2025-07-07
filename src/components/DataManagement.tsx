@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Book, Users, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Save, X, Book, Users, Upload, Download } from 'lucide-react';
 import { criminalCodeData, CriminalCodeItem } from '../data/criminalCode';
 import { prosecutorsData, Prosecutor } from '../data/prosecutors';
+import { dbManager } from '../utils/indexedDB';
+import { useIndexedDB } from '../hooks/useIndexedDB';
 
 interface DataManagementProps {
   onUpdateCriminalCode: (data: CriminalCodeItem[]) => void;
@@ -9,13 +11,50 @@ interface DataManagementProps {
 }
 
 const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, onUpdateProsecutors }) => {
-  const [activeSection, setActiveSection] = useState<'criminal' | 'prosecutors'>('criminal');
+  const [activeSection, setActiveSection] = useState<'criminal' | 'prosecutors' | 'backup'>('criminal');
   const [criminalData, setCriminalData] = useState<CriminalCodeItem[]>(criminalCodeData);
   const [prosecutorData, setProsecutorData] = useState<Prosecutor[]>(prosecutorsData);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<any>(null);
   const [bulkImportText, setBulkImportText] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
+  
+  const { exportData, importData } = useIndexedDB();
+
+  // Load data from IndexedDB on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const savedCriminalCode = await dbManager.loadData<CriminalCodeItem>('criminalCode');
+        const savedProsecutors = await dbManager.loadData<Prosecutor>('prosecutors');
+        
+        if (savedCriminalCode.length > 0) {
+          setCriminalData(savedCriminalCode);
+        }
+        if (savedProsecutors.length > 0) {
+          setProsecutorData(savedProsecutors);
+        }
+      } catch (error) {
+        console.error('Failed to load data:', error);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Save data to IndexedDB when changed
+  useEffect(() => {
+    const saveData = async () => {
+      try {
+        await dbManager.saveData('criminalCode', criminalData);
+        await dbManager.saveData('prosecutors', prosecutorData);
+      } catch (error) {
+        console.error('Failed to save data:', error);
+      }
+    };
+
+    saveData();
+  }, [criminalData, prosecutorData]);
 
   // Bulk Import for Criminal Code
   const processBulkImport = () => {
@@ -93,8 +132,8 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     const newProsecutor: Prosecutor = {
       id: Date.now().toString(),
       name: '',
-      title: 'Kiểm sát viên', // Default value
-      department: '' // Empty by default
+      title: 'Kiểm sát viên',
+      department: ''
     };
     setNewItem(newProsecutor);
   };
@@ -119,6 +158,32 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     const updated = prosecutorData.filter(prosecutor => prosecutor.id !== id);
     setProsecutorData(updated);
     onUpdateProsecutors(updated);
+  };
+
+  // Backup & Restore
+  const handleExportData = async () => {
+    const success = await exportData();
+    if (success) {
+      alert('Dữ liệu đã được xuất thành công!');
+    } else {
+      alert('Có lỗi xảy ra khi xuất dữ liệu.');
+    }
+  };
+
+  const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const success = await importData(file);
+    if (success) {
+      alert('Dữ liệu đã được nhập thành công! Vui lòng tải lại trang.');
+      window.location.reload();
+    } else {
+      alert('Có lỗi xảy ra khi nhập dữ liệu. Vui lòng kiểm tra định dạng file.');
+    }
+    
+    // Reset input
+    event.target.value = '';
   };
 
   const CriminalCodeForm: React.FC<{ item: CriminalCodeItem; onSave: (item: CriminalCodeItem) => void; onCancel: () => void }> = ({ item, onSave, onCancel }) => {
@@ -256,7 +321,63 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
           <Users size={18} />
           Kiểm Sát Viên
         </button>
+        <button
+          onClick={() => setActiveSection('backup')}
+          className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium ${
+            activeSection === 'backup' 
+              ? 'border-blue-500 text-blue-600' 
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Download size={18} />
+          Sao Lưu & Khôi Phục
+        </button>
       </div>
+
+      {/* Backup & Restore Section */}
+      {activeSection === 'backup' && (
+        <div>
+          <h3 className="text-xl font-semibold mb-4">Sao Lưu & Khôi Phục Dữ Liệu</h3>
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium text-blue-800 mb-2">Xuất Dữ Liệu</h4>
+              <p className="text-sm text-blue-600 mb-3">
+                Xuất toàn bộ dữ liệu (vụ án, tin báo, điều luật, kiểm sát viên) thành file JSON để sao lưu.
+              </p>
+              <button
+                onClick={handleExportData}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                <Download size={16} />
+                Xuất Dữ Liệu
+              </button>
+            </div>
+
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h4 className="font-medium text-green-800 mb-2">Nhập Dữ Liệu</h4>
+              <p className="text-sm text-green-600 mb-3">
+                Khôi phục dữ liệu từ file JSON đã xuất trước đó. <strong>Lưu ý:</strong> Thao tác này sẽ ghi đè lên dữ liệu hiện tại.
+              </p>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportData}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+              />
+            </div>
+
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <h4 className="font-medium text-yellow-800 mb-2">Lưu Ý Quan Trọng</h4>
+              <ul className="text-sm text-yellow-700 space-y-1">
+                <li>• Dữ liệu được lưu trữ cục bộ trên máy tính của bạn</li>
+                <li>• Thường xuyên sao lưu dữ liệu để tránh mất mát</li>
+                <li>• Khi chuyển máy tính, hãy xuất dữ liệu và nhập lại trên máy mới</li>
+                <li>• File sao lưu chứa toàn bộ thông tin nhạy cảm, hãy bảo mật cẩn thận</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Criminal Code Section */}
       {activeSection === 'criminal' && (

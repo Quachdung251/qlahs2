@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2, CheckCircle, XCircle, PauseCircle, Download, Edit2, MoreHorizontal, Send } from 'lucide-react';
 import { Report, CaseFormData } from '../types';
-import { getCurrentDate } from '../utils/dateUtils';
+import { getCurrentDate, getDaysRemaining } from '../utils/dateUtils';
 import ReportEditModal from './ReportEditModal';
 
 interface ReportTableProps {
@@ -182,6 +182,19 @@ const ReportTable: React.FC<ReportTableProps> = ({
         return renderReportNameCell(report);
       case 'notes':
         return renderNotesCell(report);
+      case 'resolutionDeadline':
+        const daysRemaining = getDaysRemaining(report.resolutionDeadline);
+        const isExpiring = daysRemaining <= 15;
+        return (
+          <div className={isExpiring ? 'text-red-600 font-medium' : ''}>
+            {report.resolutionDeadline}
+            {isExpiring && (
+              <div className="text-xs">
+                (còn {daysRemaining} ngày)
+              </div>
+            )}
+          </div>
+        );
       case 'actions':
         const stageActions = getStageActions(report);
         const isExpanded = expandedActions.has(report.id);
@@ -309,7 +322,7 @@ const ReportTable: React.FC<ReportTableProps> = ({
                               <span className="font-medium">Tội danh:</span> {report.charges}
                             </div>
                             <div>
-                              <span className="font-medium">Ngày tiếp nhận:</span> {report.reportDate}
+                              <span className="font-medium">Hạn giải quyết:</span> {report.resolutionDeadline}
                             </div>
                             <div>
                               <span className="font-medium">KSV phụ trách:</span> {report.prosecutor}

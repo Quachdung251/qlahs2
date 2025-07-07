@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Scale, FileText, LogOut, Users } from 'lucide-react';
 import TabNavigation from './components/TabNavigation';
 import CaseForm from './components/CaseForm';
@@ -13,26 +13,40 @@ import LoginForm from './components/LoginForm';
 import UserManagement from './components/UserManagement';
 import { useCases } from './hooks/useCases';
 import { useReports } from './hooks/useReports';
-import { useAuth } from './hooks/useAuth';
+import { useSupabaseAuth } from './hooks/useSupabaseAuth';
+import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './data/prosecutors';
 
 type SystemType = 'cases' | 'reports';
 
 const App: React.FC = () => {
-  const { session, users, login, logout, createUser, deleteUser, changePassword, getCurrentUserKey } = useAuth();
+  const { user, loading, signIn, signOut, isAuthenticated } = useSupabaseAuth();
+  const { isInitialized } = useIndexedDB();
   const [activeSystem, setActiveSystem] = useState<SystemType>('cases');
   const [activeTab, setActiveTab] = useState('add');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProsecutor, setSelectedProsecutor] = useState('');
   
-  const userKey = getCurrentUserKey();
-  const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases } = useCases(userKey);
-  const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports } = useReports(userKey);
+  const userKey = user?.id || 'default';
+  const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading } = useCases(userKey);
+  const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading } = useReports(userKey);
 
-  // Show login form if not logged in
-  if (!session.isLoggedIn) {
-    return <LoginForm onLogin={login} />;
+  // Show loading while initializing
+  if (loading || !isInitialized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Scale className="text-blue-600 mx-auto mb-4" size={48} />
+          <p className="text-gray-600">Đang khởi tạo hệ thống...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
+    return <LoginForm onLogin={signIn} />;
   }
 
   // Reset tab when switching systems
@@ -147,7 +161,7 @@ const App: React.FC = () => {
         return [
           ...baseColumns,
           { key: 'charges' as const, label: 'Tội danh' },
-          { key: 'reportDate' as const, label: 'Ngày tiếp nhận' },
+          { key: 'resolutionDeadline' as const, label: 'Hạn giải quyết' },
           { key: 'prosecutor' as const, label: 'KSV' },
           { key: 'notes' as const, label: 'Ghi chú' },
           { key: 'stage' as const, label: 'Trạng thái' },
@@ -157,7 +171,7 @@ const App: React.FC = () => {
         return [
           ...baseColumns,
           { key: 'charges' as const, label: 'Tội danh' },
-          { key: 'reportDate' as const, label: 'Ngày tiếp nhận' },
+          { key: 'resolutionDeadline' as const, label: 'Hạn giải quyết' },
           { key: 'prosecutor' as const, label: 'KSV' },
           { key: 'notes' as const, label: 'Ghi chú' },
           { key: 'actions' as const, label: 'Hành động' }
@@ -166,7 +180,7 @@ const App: React.FC = () => {
         return [
           ...baseColumns,
           { key: 'charges' as const, label: 'Tội danh' },
-          { key: 'reportDate' as const, label: 'Ngày tiếp nhận' },
+          { key: 'resolutionDeadline' as const, label: 'Hạn giải quyết' },
           { key: 'prosecutor' as const, label: 'KSV' },
           { key: 'notes' as const, label: 'Ghi chú' },
           { key: 'actions' as const, label: 'Hành động' }
@@ -177,6 +191,8 @@ const App: React.FC = () => {
   };
 
   const getCaseTableData = () => {
+    if (casesLoading) return [];
+    
     let data;
     switch (activeTab) {
       case 'all':
@@ -201,6 +217,8 @@ const App: React.FC = () => {
   };
 
   const getReportTableData = () => {
+    if (reportsLoading) return [];
+    
     let data;
     switch (activeTab) {
       case 'all':
@@ -228,29 +246,12 @@ const App: React.FC = () => {
         case 'statistics':
           return <ReportStatistics reports={reports} />;
         case 'data':
-          if (session.user?.role === 'admin') {
-            return (
-              <div className="space-y-8">
-                <UserManagement
-                  users={users}
-                  onCreateUser={createUser}
-                  onDeleteUser={deleteUser}
-                  onChangePassword={changePassword}
-                />
-                <DataManagement
-                  onUpdateCriminalCode={handleUpdateCriminalCode}
-                  onUpdateProsecutors={handleUpdateProsecutors}
-                />
-              </div>
-            );
-          } else {
-            return (
-              <DataManagement
-                onUpdateCriminalCode={handleUpdateCriminalCode}
-                onUpdateProsecutors={handleUpdateProsecutors}
-              />
-            );
-          }
+          return (
+            <DataManagement
+              onUpdateCriminalCode={handleUpdateCriminalCode}
+              onUpdateProsecutors={handleUpdateProsecutors}
+            />
+          );
         default:
           return (
             <>
@@ -278,29 +279,12 @@ const App: React.FC = () => {
         case 'statistics':
           return <Statistics cases={cases} />;
         case 'data':
-          if (session.user?.role === 'admin') {
-            return (
-              <div className="space-y-8">
-                <UserManagement
-                  users={users}
-                  onCreateUser={createUser}
-                  onDeleteUser={deleteUser}
-                  onChangePassword={changePassword}
-                />
-                <DataManagement
-                  onUpdateCriminalCode={handleUpdateCriminalCode}
-                  onUpdateProsecutors={handleUpdateProsecutors}
-                />
-              </div>
-            );
-          } else {
-            return (
-              <DataManagement
-                onUpdateCriminalCode={handleUpdateCriminalCode}
-                onUpdateProsecutors={handleUpdateProsecutors}
-              />
-            );
-          }
+          return (
+            <DataManagement
+              onUpdateCriminalCode={handleUpdateCriminalCode}
+              onUpdateProsecutors={handleUpdateProsecutors}
+            />
+          );
         default:
           return (
             <>
@@ -372,13 +356,11 @@ const App: React.FC = () => {
               </div>
               
               <div className="flex items-center gap-2 text-sm text-gray-600">
-                {session.user?.role === 'admin' && <Users size={16} />}
-                <span>{session.user?.username}</span>
-                {session.user?.role === 'admin' && <span className="text-blue-600 font-medium">(Admin)</span>}
+                <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
               
               <button
-                onClick={logout}
+                onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
               >
                 <LogOut size={16} />

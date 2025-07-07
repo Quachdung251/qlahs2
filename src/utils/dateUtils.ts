@@ -35,3 +35,9 @@ export const isExpiringSoon = (deadline: string): boolean => {
 export const getCurrentDate = (): string => {
   return formatDate(new Date());
 };
+
+export const addDaysToDate = (dateString: string, days: number): string => {
+  const date = parseDate(dateString);
+  date.setDate(date.getDate() + days);
+  return formatDate(date);
+};

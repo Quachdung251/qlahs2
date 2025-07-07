@@ -1,22 +1,51 @@
 import { useState, useEffect } from 'react';
 import { Report, ReportFormData } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
+import { dbManager } from '../utils/indexedDB';
 
 export const useReports = (userKey: string) => {
   const [reports, setReports] = useState<Report[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load reports from localStorage on mount
+  // Load reports from IndexedDB on mount
   useEffect(() => {
-    const savedReports = localStorage.getItem(`legalReports_${userKey}`);
-    if (savedReports) {
-      setReports(JSON.parse(savedReports));
-    }
+    const loadReports = async () => {
+      try {
+        const savedReports = await dbManager.loadData<Report>('reports');
+        setReports(savedReports);
+      } catch (error) {
+        console.error('Failed to load reports:', error);
+        // Fallback to localStorage
+        const fallbackReports = localStorage.getItem(`legalReports_${userKey}`);
+        if (fallbackReports) {
+          setReports(JSON.parse(fallbackReports));
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadReports();
   }, [userKey]);
 
-  // Save reports to localStorage whenever reports change
+  // Save reports to IndexedDB whenever reports change
   useEffect(() => {
-    localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(reports));
-  }, [reports, userKey]);
+    if (!isLoading && reports.length >= 0) {
+      const saveReports = async () => {
+        try {
+          await dbManager.saveData('reports', reports);
+          // Also save to localStorage as backup
+          localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(reports));
+        } catch (error) {
+          console.error('Failed to save reports:', error);
+          // Fallback to localStorage
+          localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(reports));
+        }
+      };
+
+      saveReports();
+    }
+  }, [reports, userKey, isLoading]);
 
   const addReport = (reportData: ReportFormData) => {
     const newReport: Report = {
@@ -63,12 +92,12 @@ export const useReports = (userKey: string) => {
       if (r.stage !== 'Đang xử lý') return false;
       
       const today = new Date();
-      const reportDate = new Date(r.reportDate.split('/').reverse().join('-'));
-      const diffTime = today.getTime() - reportDate.getTime();
+      const deadlineDate = new Date(r.resolutionDeadline.split('/').reverse().join('-'));
+      const diffTime = deadlineDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
-      // Cảnh báo nếu tin báo đã tiếp nhận >= 30 ngày mà chưa xử lý
-      return diffDays >= 30;
+      // Cảnh báo nếu tin báo sắp hết hạn giải quyết (còn <= 15 ngày)
+      return diffDays <= 15;
     });
   };
 
@@ -79,6 +108,7 @@ export const useReports = (userKey: string) => {
     deleteReport,
     transferReportStage,
     getReportsByStage,
-    getExpiringSoonReports
+    getExpiringSoonReports,
+    isLoading
   };
 };

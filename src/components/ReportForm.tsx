@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, FileText, Shield, User, Calendar } from 'lucide-react';
 import { ReportFormData, CaseFormData } from '../types';
-import { getCurrentDate } from '../utils/dateUtils';
+import { getCurrentDate, addDaysToDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
 import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
@@ -16,7 +16,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
   const [formData, setFormData] = useState<ReportFormData>({
     name: '',
     charges: '',
-    reportDate: getCurrentDate(),
+    resolutionDeadline: addDaysToDate(getCurrentDate(), 30), // Mặc định 30 ngày từ hôm nay
     prosecutor: '',
     notes: ''
   });
@@ -27,7 +27,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
     setFormData({
       name: '',
       charges: '',
-      reportDate: getCurrentDate(),
+      resolutionDeadline: addDaysToDate(getCurrentDate(), 30),
       prosecutor: '',
       notes: ''
     });
@@ -50,7 +50,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
     setFormData({
       name: '',
       charges: '',
-      reportDate: getCurrentDate(),
+      resolutionDeadline: addDaysToDate(getCurrentDate(), 30),
       prosecutor: '',
       notes: ''
     });
@@ -112,9 +112,9 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
           </div>
           
           <DateInput
-            value={formData.reportDate}
-            onChange={(value) => setFormData({ ...formData, reportDate: value })}
-            label="Ngày Tiếp Nhận"
+            value={formData.resolutionDeadline}
+            onChange={(value) => setFormData({ ...formData, resolutionDeadline: value })}
+            label="Ngày Hết Hạn Giải Quyết"
             required
           />
           

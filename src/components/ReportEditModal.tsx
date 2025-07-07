@@ -80,9 +80,9 @@ const ReportEditModal: React.FC<ReportEditModalProps> = ({ report, onSave, onClo
             </div>
             
             <DateInput
-              value={formData.reportDate}
-              onChange={(value) => setFormData({ ...formData, reportDate: value })}
-              label="Ngày Tiếp Nhận"
+              value={formData.resolutionDeadline}
+              onChange={(value) => setFormData({ ...formData, resolutionDeadline: value })}
+              label="Ngày Hết Hạn Giải Quyết"
               required
             />
             
