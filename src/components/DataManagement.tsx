@@ -1,27 +1,29 @@
+// src/components/DataManagement.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Save, X, Book, Users, Upload, Download } from 'lucide-react';
-// Giữ lại import này nếu bạn vẫn muốn quản lý CriminalCode cục bộ
-import { criminalCodeData, CriminalCodeItem } from '../data/criminalCode'; 
-import { dbManager } from '../utils/indexedDB'; // Vẫn dùng IndexedDB cho việc lưu cục bộ
+
+// Import dữ liệu và interface cho Bộ luật Hình sự (vẫn cục bộ)
+import { criminalCodeData, CriminalCodeItem } from '../data/criminalCode';
+// Import các tiện ích IndexedDB
+import { dbManager } from '../utils/indexedDB';
 import { useIndexedDB } from '../hooks/useIndexedDB';
 
 // Import các hàm và interface cho Kiểm sát viên từ Supabase API
 import {
   fetchProsecutors,
   addProsecutor,
-  searchProsecutors,
-  // Thêm updateProsecutor và deleteProsecutor nếu bạn đã tạo chúng trong src/api/prosecutors.ts
-  // updateProsecutor,
-  // deleteProsecutor,
-  Prosecutor // Import interface Prosecutor từ file api
+  updateProsecutor, // Đã thêm
+  deleteProsecutor, // Đã thêm
+  Prosecutor
 } from '../api/prosecutors';
 
-import { useSupabaseAuth } from '../hooks/useSupabaseAuth'; // Để lấy thông tin user Supabase
+// Import hook xác thực Supabase
+import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
 
 interface DataManagementProps {
-  // onUpdateCriminalCode và onUpdateProsecutors sẽ không còn được sử dụng để đẩy dữ liệu lên cha nữa
-  // vì dữ liệu sẽ được quản lý trực tiếp qua Supabase và IndexedDB.
-  // Bạn có thể giữ chúng nếu có các side-effects khác cần được kích hoạt.
+  // Các hàm này có thể được dùng để thông báo cho component cha
+  // về sự thay đổi của dữ liệu, nếu cần re-render hoặc cập nhật ở nơi khác.
   onUpdateCriminalCode: (data: CriminalCodeItem[]) => void;
   onUpdateProsecutors: (data: Prosecutor[]) => void;
 }
@@ -30,17 +32,18 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
   const { user, loading: authLoading } = useSupabaseAuth(); // Lấy thông tin user Supabase
   const [activeSection, setActiveSection] = useState<'criminal' | 'prosecutors' | 'backup'>('criminal');
   const [criminalData, setCriminalData] = useState<CriminalCodeItem[]>(criminalCodeData);
-  // Thay đổi trạng thái này để chứa dữ liệu từ Supabase, không phải từ mảng cứng nữa
-  const [prosecutorData, setProsecutorData] = useState<Prosecutor[]>([]); 
+
+  // Khởi tạo prosecutorData là mảng rỗng, dữ liệu sẽ được tải từ Supabase
+  const [prosecutorData, setProsecutorData] = useState<Prosecutor[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<any>(null); // Có thể là CriminalCodeItem hoặc Prosecutor
   const [bulkImportText, setBulkImportText] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
-  const [prosecutorLoading, setProsecutorLoading] = useState(true); // Thêm trạng thái loading cho Kiểm sát viên
+  const [prosecutorLoading, setProsecutorLoading] = useState(true); // Trạng thái loading riêng cho Kiểm sát viên
 
   const { exportData, importData } = useIndexedDB();
 
-  // Load Criminal Code data from IndexedDB on mount
+  // useEffect để tải dữ liệu Bộ luật Hình sự từ IndexedDB khi component mount
   useEffect(() => {
     const loadCriminalData = async () => {
       try {
@@ -53,9 +56,9 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
       }
     };
     loadCriminalData();
-  }, []);
+  }, []); // Chạy một lần khi component mount
 
-  // Save Criminal Code data to IndexedDB when changed
+  // useEffect để lưu dữ liệu Bộ luật Hình sự vào IndexedDB khi có thay đổi
   useEffect(() => {
     const saveCriminalData = async () => {
       try {
@@ -65,9 +68,9 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
       }
     };
     saveCriminalData();
-  }, [criminalData]);
+  }, [criminalData]); // Chạy khi criminalData thay đổi
 
-  // Load Prosecutor data from Supabase when user changes or on mount
+  // useEffect để tải dữ liệu Kiểm sát viên từ Supabase
   useEffect(() => {
     const loadProsecutorsFromSupabase = async () => {
       // Chỉ tải dữ liệu nếu người dùng đã được xác định và không còn trong trạng thái loading của auth
@@ -173,11 +176,11 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     }
 
     if (isNew) {
-      // Gọi hàm addProsecutor từ api/prosecutors.ts (sẽ gửi lên Supabase)
       const { success, error } = await addProsecutor(item);
       if (success) {
         alert('Thêm Kiểm sát viên thành công!');
         setNewItem(null); // Đóng form thêm mới
+        setEditingId(null); // Đảm bảo không có item nào đang được chỉnh sửa
         const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
         setProsecutorData(updatedData);
         onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
@@ -185,20 +188,22 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
         alert('Lỗi khi thêm Kiểm sát viên: ' + error?.message);
       }
     } else {
-      // Logic cho việc UPDATE (bạn cần thêm hàm updateProsecutor vào src/api/prosecutors.ts)
-      // Hiện tại, tôi sẽ để trống hoặc chỉ alert nếu chưa có hàm update
-      alert('Chức năng sửa Kiểm sát viên chưa được triển khai đầy đủ với Supabase.');
-      // Ví dụ nếu có updateProsecutor:
-      // const { success, error } = await updateProsecutor(item.id!, item);
-      // if (success) {
-      //   alert('Cập nhật Kiểm sát viên thành công!');
-      //   setEditingId(null);
-      //   const updatedData = await fetchProsecutors();
-      //   setProsecutorData(updatedData);
-      //   onUpdateProsecutors(updatedData);
-      // } else {
-      //   alert('Lỗi khi cập nhật Kiểm sát viên: ' + error?.message);
-      // }
+      // Logic cho việc UPDATE
+      // Đảm bảo item.id tồn tại khi cập nhật
+      if (!item.id) {
+          alert('Không tìm thấy ID Kiểm sát viên để cập nhật.');
+          return;
+      }
+      const { success, error } = await updateProsecutor(item.id, { name: item.name, title: item.title, department: item.department });
+      if (success) {
+        alert('Cập nhật Kiểm sát viên thành công!');
+        setEditingId(null);
+        const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
+        setProsecutorData(updatedData);
+        onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
+      } else {
+        alert('Lỗi khi cập nhật Kiểm sát viên: ' + error?.message);
+      }
     }
   };
 
@@ -208,18 +213,15 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
       return;
     }
     if (window.confirm('Bạn có chắc chắn muốn xóa Kiểm sát viên này?')) {
-      // Logic cho việc DELETE (bạn cần thêm hàm deleteProsecutor vào src/api/prosecutors.ts)
-      alert('Chức năng xóa Kiểm sát viên chưa được triển khai đầy đủ với Supabase.');
-      // Ví dụ nếu có deleteProsecutor:
-      // const { success, error } = await deleteProsecutor(id);
-      // if (success) {
-      //   alert('Xóa Kiểm sát viên thành công!');
-      //   const updatedData = await fetchProsecutors();
-      //   setProsecutorData(updatedData);
-      //   onUpdateProsecutors(updatedData);
-      // } else {
-      //   alert('Lỗi khi xóa Kiểm sát viên: ' + error?.message);
-      // }
+      const { success, error } = await deleteProsecutor(id);
+      if (success) {
+        alert('Xóa Kiểm sát viên thành công!');
+        const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
+        setProsecutorData(updatedData);
+        onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
+      } else {
+        alert('Lỗi khi xóa Kiểm sát viên: ' + error?.message);
+      }
     }
   };
 
@@ -240,13 +242,14 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     const success = await importData(file);
     if (success) {
       alert('Dữ liệu đã được nhập thành công! Vui lòng tải lại trang.');
-      window.location.reload();
+      window.location.reload(); // Reload để tải lại dữ liệu từ IndexedDB sau khi import
     } else {
       alert('Có lỗi xảy ra khi nhập dữ liệu. Vui lòng kiểm tra định dạng file.');
     }
-    event.target.value = '';
+    event.target.value = ''; // Reset input file để có thể chọn lại cùng một file
   };
 
+  // Form cho Bộ luật Hình sự
   const CriminalCodeForm: React.FC<{ item: CriminalCodeItem; onSave: (item: CriminalCodeItem) => void; onCancel: () => void }> = ({ item, onSave, onCancel }) => {
     const [formData, setFormData] = useState(item);
 
@@ -292,6 +295,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     );
   };
 
+  // Form cho Kiểm sát viên
   const ProsecutorForm: React.FC<{ item: Prosecutor; onSave: (item: Prosecutor, isNew: boolean) => void; onCancel: () => void; isNew: boolean }> = ({ item, onSave, onCancel, isNew }) => {
     const [formData, setFormData] = useState(item);
 
@@ -590,7 +594,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
                   {newItem && activeSection === 'prosecutors' && (
                     <ProsecutorForm
                       item={newItem}
-                      onSave={(item) => saveOrUpdateProsecutor(item, true)} // Gọi hàm mới
+                      onSave={(item) => saveOrUpdateProsecutor(item, true)}
                       onCancel={() => setNewItem(null)}
                       isNew={true}
                     />
@@ -600,7 +604,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
                       <ProsecutorForm
                         key={prosecutor.id}
                         item={prosecutor}
-                        onSave={(item) => saveOrUpdateProsecutor(item, false)} // Gọi hàm mới
+                        onSave={(item) => saveOrUpdateProsecutor(item, false)}
                         onCancel={() => setEditingId(null)}
                         isNew={false}
                       />
