@@ -8,10 +8,13 @@ export interface Prosecutor {
   name: string;
   title: string;
   department?: string;
-  user_id?: string; // Cần user_id để liên kết với người dùng tạo
+  user_id?: string; // Cần user_id để liên kết với người dùng tạo, nhưng Supabase RLS sẽ điền tự động
 }
 
-// Hàm để lấy dữ liệu Kiểm sát viên từ Supabase (dữ liệu riêng của mỗi user)
+/**
+ * Lấy danh sách Kiểm sát viên thuộc về người dùng hiện tại (dựa trên RLS).
+ * @returns Mảng các Kiểm sát viên.
+ */
 export const fetchProsecutors = async (): Promise<Prosecutor[]> => {
   const { data, error } = await supabase
     .from('prosecutors') // Tên bảng của bạn
@@ -25,9 +28,12 @@ export const fetchProsecutors = async (): Promise<Prosecutor[]> => {
   return data || [];
 };
 
-// Hàm để tìm kiếm Kiểm sát viên (trong dữ liệu riêng của user)
-// Hàm này sẽ không được dùng trực tiếp trong DataManagement.tsx hiện tại
-// nhưng giữ lại nếu bạn muốn thêm tính năng tìm kiếm sau này.
+/**
+ * Tìm kiếm Kiểm sát viên dựa trên từ khóa (tên, chức danh, phòng ban).
+ * Lưu ý: Với RLS, hàm này chỉ tìm kiếm trong dữ liệu mà người dùng hiện tại có quyền truy cập.
+ * @param query Từ khóa tìm kiếm.
+ * @returns Mảng các Kiểm sát viên khớp với từ khóa.
+ */
 export const searchProsecutors = async (query: string): Promise<Prosecutor[]> => {
   if (!query.trim()) {
     return fetchProsecutors(); // Trả về tất cả nếu không có query
@@ -47,10 +53,13 @@ export const searchProsecutors = async (query: string): Promise<Prosecutor[]> =>
   return data || [];
 };
 
-// Hàm để thêm Kiểm sát viên mới (vào dữ liệu riêng của user)
+/**
+ * Thêm một Kiểm sát viên mới vào cơ sở dữ liệu.
+ * user_id sẽ được tự động điền bởi RLS policy của Supabase.
+ * @param newProsecutor Đối tượng Kiểm sát viên mới (không cần id và user_id).
+ * @returns Kết quả thao tác (thành công/thất bại) và dữ liệu của Kiểm sát viên đã thêm.
+ */
 export const addProsecutor = async (newProsecutor: Omit<Prosecutor, 'id' | 'user_id'>): Promise<{ success: boolean; data?: Prosecutor; error?: any }> => {
-  // Vì bạn đã đặt user_id làm DEFAULT VALUE auth.uid() trong DB,
-  // bạn không cần truyền user_id từ frontend nữa. Supabase sẽ tự động điền.
   const { data, error } = await supabase
     .from('prosecutors')
     .insert([newProsecutor])
@@ -64,8 +73,12 @@ export const addProsecutor = async (newProsecutor: Omit<Prosecutor, 'id' | 'user
   return { success: true, data: data[0] };
 };
 
-// **HÀM MỚI/CẬP NHẬT**
-// Hàm để cập nhật Kiểm sát viên
+/**
+ * Cập nhật thông tin của một Kiểm sát viên hiện có.
+ * @param id ID của Kiểm sát viên cần cập nhật.
+ * @param updatedFields Các trường cần cập nhật.
+ * @returns Kết quả thao tác (thành công/thất bại) và dữ liệu của Kiểm sát viên đã cập nhật.
+ */
 export const updateProsecutor = async (id: string, updatedFields: Partial<Omit<Prosecutor, 'id' | 'user_id'>>): Promise<{ success: boolean; data?: Prosecutor; error?: any }> => {
   const { data, error } = await supabase
     .from('prosecutors')
@@ -81,8 +94,11 @@ export const updateProsecutor = async (id: string, updatedFields: Partial<Omit<P
   return { success: true, data: data[0] };
 };
 
-// **HÀM MỚI/CẬP NHẬT**
-// Hàm để xóa Kiểm sát viên
+/**
+ * Xóa một Kiểm sát viên khỏi cơ sở dữ liệu.
+ * @param id ID của Kiểm sát viên cần xóa.
+ * @returns Kết quả thao tác (thành công/thất bại).
+ */
 export const deleteProsecutor = async (id: string): Promise<{ success: boolean; error?: any }> => {
   const { error } = await supabase
     .from('prosecutors')
